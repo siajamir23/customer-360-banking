@@ -40,7 +40,7 @@ Chosen default: **Option A** — it honors the project rule "do not modify the e
 
 ## 4. Enrichment Contract (`customer_360_profile` → fraud platform)
 
-**Join key:** `customer_id` (verified compatible). **Join type: LEFT** (fraud customers keep their row even without a 360 profile). **Expected coverage:** ~80% of fraud customers match a 360 profile (8,000 of 10,000 CIS seed overlap by design; the remaining 2,000 fraud customers are not represented in CIS in v1 — documented limitation, reported as a coverage metric, not hidden).
+**Join key:** `customer_id` (verified compatible). **Join type: LEFT** (fraud customers keep their row even without a 360 profile). **Expected coverage: ~100%** of fraud customers match a 360 profile — the approved shared population seeds **all 10,000** existing fraud customers (approved adjustment 2026-11-19); residual non-coverage arises only from quarantined identity conflicts (~1–3%) and is reported as a coverage metric, never hidden. The 2,000 additional new customers (`CUST-100001+`, assigned by R5 in Phase 6) exist only in the 360 domain and never appear in fraud transactions, by design.
 
 | `customer_360_profile` column | Enrichment use in fraud analytics |
 |------------------------------|----------------------------------|
@@ -80,7 +80,7 @@ Chosen default: **Option A** — it honors the project rule "do not modify the e
 
 ## Acceptance Criteria
 
-1. Enrichment join produces exactly 10,000 rows (one per fraud customer) with ~80% non-null `has_360_profile` — validated in Phase 11 before any write.
+1. Enrichment join produces exactly 10,000 rows (one per fraud customer) with ≥97% non-null `has_360_profile` (100% seeded coverage minus quarantined conflicts) — validated in Phase 11 before any write.
 2. Zero columns of the existing `fraud_detection.silver.customers` are altered by the integration (additive-only proof: column diff before/after).
 3. Coverage, join-fan-out, and null-rate metrics are reported and persisted for audit.
 4. The fraud pipeline continues to run unchanged and passes its existing data quality task after integration.

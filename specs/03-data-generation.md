@@ -1,6 +1,6 @@
 # 03 — Synthetic Multi-Source Data Generation
 
-**Phase:** 3 (Synthetic Data Generation) · **Status:** **Proposed — awaiting approval**  
+**Phase:** 3 (Synthetic Data Generation) · **Status:** **Approved 2026-11-19 with adjustments** — population 12,000 (all 10,000 fraud customers + 2,000 new); Amendment 1 approved with binding email-matching rules; modular `src/` layout  
 **Depends on:** all five Phase-2 specs (`02-*`)
 
 ## Objective
@@ -9,64 +9,94 @@ Produce six reproducible, entirely synthetic banking source datasets (CSV) that 
 
 ---
 
-## ⚠ Proposed Amendment 1 (requires approval — flagged, not silently applied)
+## ✅ Amendment 1 — APPROVED 2026-11-19 (with binding email-matching rules)
 
-**Gap discovered while designing this phase:** the five product contracts (accounts, cards, loans, digital logins, support cases) carry only a native customer ref and a `global_customer_ref` — **no PII match key**. But identity resolution's R1 (global ref) has a 70–85% carry rate, and R2–R4 keys (email/phone/name+DOB) exist only on CIS. As specced, **15–30% of product rows would be deterministically unresolvable**, contradicting the approved ~2% orphan rate.
+**Gap (found while designing this phase):** the five product contracts (accounts, cards, loans, digital logins, support cases) carried only a native customer ref and a `global_customer_ref` — no PII match key. R1 (global ref) has a 70–85% carry rate and R2–R4 keys existed only on CIS, so 15–30% of product rows would have been deterministically unresolvable, contradicting the approved ~2% orphan rate.
 
-**Amendment:** add one column to each of the five product contracts:
+**Amendment (approved):** one nullable column added to each of the five product contracts:
 
 | Column | Type | Nullable | Rule |
 |--------|------|----------|------|
-| `customer_email` | STRING | Yes | The account/card/loan/ticket holder's email **as recorded by that source system**; populated on ~85% of rows; same normalization/validation as CIS email; ~5% invalid |
+| `customer_email` | STRING | Yes | The holder's email **as recorded by that source system**; ~85% populated; ~5% invalid; same normalization as CIS email |
 
-Rationale: real core-banking/card/loan extracts do carry holder email; it is the only cross-system key that makes R2 meaningful outside CIS; it also feeds the approved conflicting-key quarantine flow (~3% of rows carry an email belonging to a different person than their global ref — deliberate identity-conflict exercise, exactly the case you endorsed quarantining rather than auto-merging).
+**Approved email-matching rules (binding):**
+
+1. `customer_email` must represent the account/card/loan/login/ticket holder (or associated customer).
+2. Emails are normalized before matching: trim whitespace, then lowercase.
+3. A missing email is **never** an automatic rejection — the record falls through to the next match rule.
+4. Conflicting email matches go to quarantine.
+5. Customers are never automatically merged on email alone when other identifiers contradict one another.
 
 With the amendment: product rows resolve via R1 (global ref) or R2 (email); engineered residual orphans ≈ 2% (rows with neither a resolvable ref nor a matching email).
 
 ---
 
-## 1. Generator Architecture (5 layers, single orchestrator notebook)
+## 1. Generator Architecture (5 layers, thin orchestrator + modular `src/`)
 
-**Notebook:** `notebooks/01_generate_synthetic_data` (numbered like the fraud project; mirrors its proven pattern).
-
-> Why one orchestrator notebook with six clearly-separated generator sections instead of six notebooks: the shared population layer must exist exactly once; orchestration stays trivial to run top-to-bottom for portfolio reviewers; per-source separation is achieved via independent, independently-seeded generator functions + config entries. (Six separate notebooks offered as an alternative if preferred.)
+**Orchestrator:** `notebooks/03_generate_source_data.py` — a thin notebook that imports the versioned `src/` modules and runs them top-to-bottom; all logic lives in modular, independently-seeded modules:
 
 ```
-Layer 1  CONFIG (single dict, top of notebook — no magic numbers below it)
+customer-360-banking/
+├── specs/03-data-generation.md
+├── src/
+│   ├── config/
+│   │   └── generator_config.py      # CONFIG dict — seeds, sizes, rates, paths (single source of truth)
+│   ├── generators/
+│   │   ├── customers.py             # CIS customer master
+│   │   ├── accounts.py              # Core Banking deposit accounts
+│   │   ├── cards.py                 # Credit Card System
+│   │   ├── loans.py                 # Loan Management System
+│   │   ├── digital_banking.py       # Digital Banking login events
+│   │   └── support.py               # Customer Support tickets
+│   └── utilities/
+│       ├── identity.py             # shared population builder + email/phone/name normalization
+│       ├── defects.py               # mixed dates, nulls, dupes, corrupt emails, conflicts, orphans
+│       └── validation.py            # contract assertions + reconciliation report
+├── notebooks/
+│   └── 03_generate_source_data.py   # thin orchestrator — no logic
+├── tests/
+│   └── test_data_generation.py      # pytest-runnable contract tests (also executed by the orchestrator)
+└── data/
+    └── README.md                    # documents UC-volume outputs, batch folders, validation reports
+```
+
+```
+Layer 1  CONFIG (single dict, src/config/generator_config.py — no magic numbers anywhere else)
          ├─ base_seed = 360          ├─ batch_id = "batch_001"
          ├─ output volume path       ├─ per-source row targets
          └─ per-defect rates (all from the approved contract table)
 
 Layer 2  SHARED POPULATION (the reconciliation backbone)
-         10,000 synthetic natural persons:
-         • 8,000 seeded READ-ONLY from fraud_detection.silver.customers
-           (global refs CUST-000001…CUST-008000; age/country/registration_date
-            aligned so enrichment never contradicts the fraud platform)
-         • 2,000 new Faker-generated persons (no global ref → Phase 6 R5 assigns
-           CUST-100001+ per the approved collision-free strategy)
+         12,000 synthetic natural persons:
+         • ALL 10,000 existing fraud customers, seeded READ-ONLY from
+           fraud_detection.silver.customers (CUST-000001…CUST-010000;
+           100% integration coverage; age/country/registration_date
+           aligned so enrichment never contradicts the fraud platform)
+         • 2,000 new Faker-generated persons (no global ref → Phase 6 R5
+           assigns CUST-100001+ per the approved collision-free strategy),
+           demonstrating new-customer onboarding
          Each person carries canonical PII (name, dob, email, phone, address)
          used consistently by every source that knows them.
 
-Layer 3  SIX SOURCE GENERATORS (independent functions)
-         cis_customers() · core_accounts() · credit_cards()
-         loan_accounts() · digital_logins() · support_tickets()
+Layer 3  SIX SOURCE GENERATORS (independent modules, one per source system)
+         src/generators/{customers,accounts,cards,loans,digital_banking,support}.py
          Each: selects its person subset → assigns ONE native ref per person
          per source (stable across that person's rows — enables xref bootstrap)
          → generates business attributes (Faker + ranges) → returns DataFrame.
 
-Layer 4  DEFECT INJECTION ENGINE (shared utilities, applied per contract)
+Layer 4  DEFECT INJECTION ENGINE (src/utilities/defects.py, applied per contract)
          mixed_date_format() · null_out() · exact_duplicate() ·
          near_duplicate() · corrupt_email() · format_phone() · orphan_ref()
          → all rates read from CONFIG; all defects reproduce on rerun.
 
-Layer 5  VALIDATION SUITE (runs last, fails loudly — §6)
+Layer 5  VALIDATION SUITE (src/utilities/validation.py — runs last, fails loudly)
 ```
 
 **Libraries:** `Faker` (names, emails, cities, addresses, device/browser names), Python `random` + `pandas` (composability, CSV write). Faker instances are **seeded per generator** (`Faker.seed(base_seed + source_offset)`), so a change to one source's config never shifts another source's data — a property the validation suite asserts.
 
 ## 2. Determinism & Reconfiguration Contract
 
-* Fixed `base_seed`; every random draw flows from a seeded generator — rerunning with identical CONFIG yields **byte-identical CSVs** (asserted via SHA-256 of files).
+* Fixed `base_seed = 360`; every random draw flows from a seeded generator — rerunning with identical CONFIG yields **byte-identical CSVs** (asserted via SHA-256 of files).
 * All sizes configurable in CONFIG (default targets below); changing one source's target re-randomizes only that source (per-generator seed independence).
 * `batch_id` parameterized: batch 2 with ~5% attribute drift is generated in Phase 7 to exercise SCD2 — not now.
 
@@ -87,7 +117,10 @@ Files (UTF-8 CSV, header row, comma):
   /Volumes/customer_360/default/raw_data/batch_001/support_cases_raw.csv
 
 Repo (versioned):
-  notebooks/01_generate_synthetic_data    (the generator)
+  notebooks/03_generate_source_data.py   (thin orchestrator)
+  src/{config,generators,utilities}/      (modular implementation — see §1)
+  tests/test_data_generation.py           (contract tests)
+  data/README.md                          (outputs & validation documentation)
   specs/03-data-generation.md             (this spec)
 ```
 
@@ -95,14 +128,14 @@ Repo (versioned):
 
 ## 4. Per-Source Generation Targets
 
-| Source | Persons covered | Rows (masters) | + dupes (raw rows) | Native ref | Global-ref carry | Email carry* |
+| Source | Persons covered (of 12,000) | Rows (masters) | + dupes (raw rows) | Native ref | Global-ref carry | Email carry* |
 |--------|----------------|----------------|--------------------|------------|------------------|--------------|
-| CIS customers | 10,000 (all) | 10,000 | +350 ≈ **10,350** | `CIS-#####` | 80% (seeded 8,000) | ~95% (contract)
-| Core accounts | ~8,000 | 12,000 (1–2/person) | +240 ≈ **12,240** | `CB-#####` | 75% | ~85% |
-| Credit cards | ~4,500 | 6,000 | +120 ≈ **6,120** | `CC-#####` | 80% | ~85% |
-| Loans | ~2,200 | 2,500 | +50 ≈ **2,550** | `LN-#####` | 70% | ~85% |
-| Digital logins | ~7,500 | 50,000 (~6.7 events/person, 12-mo window) | +1,000 ≈ **51,000** | `DB-#####` | 85% | ~85% |
-| Support tickets | ~5,500 | 8,000 (1–2/person) | +160 ≈ **8,160** | `CS-#####` | 75% | ~85% |
+| CIS customers | 12,000 (all) | 12,000 | +420 ≈ **12,420** | `CIS-#####` | 83% (all 10,000 seeded) | ~95% (contract) |
+| Core accounts | ~9,600 (80%) | 14,000 (1–2/person) | +280 ≈ **14,280** | `CB-#####` | 75% | ~85% |
+| Credit cards | ~5,400 (45%) | 6,600 | +130 ≈ **6,730** | `CC-#####` | 80% | ~85% |
+| Loans | ~2,650 (22%) | 2,800 | +55 ≈ **2,855** | `LN-#####` | 70% | ~85% |
+| Digital logins | ~9,000 (75%) | 55,000 (~6 events/person, 12-mo window) | +1,100 ≈ **56,100** | `DB-#####` | 85% | ~85% |
+| Support tickets | ~6,600 (55%) | 9,000 (1–2/person) | +180 ≈ **9,180** | `CS-#####` | 75% | ~85% |
 
 \* email carry applies where the row's holder is known; the two columns are engineered so that rows with **neither** a resolvable global ref **nor** a matching email ≈ **2%** (orphans). Business attribute ranges (balances, limits, rates, statuses, domains) come verbatim from `02-source-data-contracts.md`.
 
@@ -119,12 +152,12 @@ Repo (versioned):
 | Identity conflicts | ~3% of rows with both keys | Email belongs to a different person than the global ref → the quarantine-not-merge case |
 | Referential orphans | ~2% | No valid global ref + email matches no known person |
 
-## 6. Validation Suite (end of notebook; asserts, not prints)
+## 6. Validation Suite (end of orchestrator; asserts, not prints)
 
 | # | Check | Expected |
 |---|-------|----------|
 | 1 | Row counts per file | Within ±2% of targets in §4 |
-| 2 | Schema conformance | Exact column names **and order** per contract (incl. `customer_email` if amendment approved) |
+| 2 | Schema conformance | Exact column names **and order** per contract (including `customer_email` on the five product sources) |
 | 3 | PK format regex | 100% conform (dupes share their master's PK by design) |
 | 4 | Duplicate rates | Exact ≈ 2% ±0.5pp; near ≈ 1.5% ±0.5pp (full-row hash / PK counts) |
 | 5 | Enum domains | 0 out-of-domain values in every enum column |
@@ -135,6 +168,7 @@ Repo (versioned):
 | 10 | Identity-conflict count | ~3% of dual-key rows (they must exist — the quarantine path needs material) |
 | 11 | Determinism | Same-CONFIG rerun → identical SHA-256 per file |
 | 12 | Seed independence | Changing one source's size re-hashes only that file |
+| 13 | Amendment-1 email rules | Missing-email rows resolve via global ref (never auto-rejected); conflicting emails ≈3% present and flagged for quarantine, never merged |
 
 Final output: a displayed **defect & reconciliation report** — one row per source: rows, dupes, missing %, format mix, invalid emails, orphans, conflicts.
 
@@ -144,8 +178,9 @@ No Bronze/Silver/Gold/Quarantine tables or schemas · no writes to `fraud_detect
 
 ## Acceptance Criteria
 
-1. Six CSVs exist under `raw_data/batch_001/` with the §4 row counts and contract-exact schemas.
-2. All 12 validation checks pass on the default config; failures raise, not warn.
-3. Rerunning the notebook changes nothing (byte-identical files, verified by hash).
+1. Six CSVs exist under `raw_data/batch_001/` with the §4 row counts and contract-exact schemas (including `customer_email` on the five product sources).
+2. All 13 validation checks pass on the default config; failures raise, not warn.
+3. Rerunning the orchestrator changes nothing (byte-identical files, verified by hash).
 4. Global refs referentially resolve against the fraud platform; new persons carry no global ref (reserved for Phase 6 R5).
 5. The defect & reconciliation report is displayed and matches the injected design rates.
+6. The shared population is 12,000 persons: all 10,000 existing fraud customers seeded read-only with preserved canonical IDs (100% coverage of the verified domain) and 2,000 new persons reserved for R5 assignment from `CUST-100001`.

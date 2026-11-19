@@ -40,6 +40,14 @@ Rules stop at first hit (cascade semantics). If a record hits a rule but with a 
 
 ## 4. Conflicting Record Resolution (survivorship)
 
+**Email-matching rules (Amendment 1 — approved 2026-11-19):** email is a match key, never a merge mandate:
+
+* An email must represent the record's holder before it can match (no shared/role emails in the synthetic population).
+* Emails are normalized (`trim` + `lower`) before any comparison (§1).
+* A **missing** email is never an automatic rejection: the record simply falls through to the next rule (R3/R4 for CIS records; the review/orphan path of §5 for product rows that also lack a global ref).
+* A **conflicting** email match (email → customer A while a valid global ref → customer B) is quarantined, never auto-merged.
+* Email alone never overrides a contradicting higher-priority identifier.
+
 When multiple resolved records disagree on an attribute:
 
 * **Source precedence (authoritative-source-wins):** CIS > Core Banking > Credit Card > Loans > Digital > Support for demographics and contact (CIS is the customer master); each operational system stays authoritative for its own product facts.
@@ -79,8 +87,9 @@ Identity resolution is rerun per batch: new source records match against the exi
 ## Assumptions
 
 1. Native source refs (`CB-#####` etc.) are unique **within** their system (each system's PK) — cross-system uniqueness is not assumed anywhere.
-2. The enterprise `CUST-######` registry beyond `CUST-010000` is free for assignment (verified: fraud platform ends at `CUST-010000`).
+2. The enterprise `CUST-######` registry beyond `CUST-010000` is free for assignment (verified: fraud platform ends at `CUST-010000`); R5 assigns new IDs starting at **`CUST-100001`**.
 3. Email is globally unique per natural person in the synthetic data except for documented conflicts (~3%) — those exercise §5.
+4. The shared population is **12,000 persons**: all 10,000 existing fraud-platform customers seeded read-only with global refs (100% coverage of the verified domain) + 2,000 new persons without global refs (R5 candidates).
 
 ## Acceptance Criteria
 
