@@ -60,7 +60,7 @@ customer-360-banking/
 | Phase | Deliverable | Status |
 |-------|-------------|--------|
 | 1 | Environment inspection & project architecture | ✅ Done |
-| 2 | Project specifications & data modeling | ⏳ Next |
+| 2 | Project specifications & data modeling | ✅ Specs complete — in review |
 | 3 | Synthetic multi-source data generation | |
 | 4 | Bronze ingestion pipelines | |
 | 5 | Silver transformation & standardization | |

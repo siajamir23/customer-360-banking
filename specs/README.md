@@ -20,7 +20,11 @@ This project follows **specification-driven development**: every major component
 
 | Phase | Component | Spec | Status |
 |-------|-----------|------|--------|
-| 2 | Project specifications & data modeling | `02-data-model.md` | Pending |
+| 2 | Source data contracts (6 source systems) | `02-source-data-contracts.md` | In review |
+| 2 | Medallion data model & Gold data products | `02-data-model.md` | In review |
+| 2 | Customer identity resolution strategy | `02-customer-identity-resolution.md` | In review |
+| 2 | SCD Type 2 strategy (dim_customer) | `02-scd-type-2.md` | In review |
+| 2 | Fraud detection integration contract | `02-fraud-integration.md` | In review |
 | 3 | Synthetic multi-source data generation | `03-data-generation.md` | Pending |
 | 4 | Bronze ingestion pipelines | `04-bronze-ingestion.md` | Pending |
 | 5 | Silver transformation & standardization | `05-silver-standardization.md` | Pending |
