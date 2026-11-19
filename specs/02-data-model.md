@@ -23,11 +23,11 @@ Define every dataset in the `customer_360` catalog — Bronze, Silver, Gold, Qua
 | Table | Source System | Grain | Volume (target) |
 |-------|--------------|-------|----------------|
 | `bronze.customers` | CIS | customer master record (dupes included) | ~12,420 raw (12,000 masters) |
-| `bronze.accounts` | Core Banking | deposit account | ~14,280 raw (14,000 masters) |
-| `bronze.cards` | Credit Card | credit card | ~6,730 raw (6,600 masters) |
-| `bronze.loans` | Loan Management | loan | ~2,855 raw (2,800 masters) |
-| `bronze.digital_logins` | Digital Banking | login event | ~56,100 raw (55,000 masters) |
-| `bronze.support_cases` | Customer Support | support ticket | ~9,180 raw (9,000 masters) |
+| `bronze.accounts` | Core Banking | deposit account | ~14,490 raw (14,000 masters) |
+| `bronze.cards` | Credit Card | credit card | ~6,831 raw (6,600 masters) |
+| `bronze.loans` | Loan Management | loan | ~2,898 raw (2,800 masters) |
+| `bronze.digital_logins` | Digital Banking | login event | ~56,925 raw (55,000 masters) |
+| `bronze.support_cases` | Customer Support | support ticket | ~9,315 raw (9,000 masters) |
 
 Common appended columns on every Bronze table: `_source_system STRING`, `_batch_id STRING`, `_ingestion_timestamp TIMESTAMP`, `_ingestion_date DATE`, `_source_file STRING`.
 

@@ -131,11 +131,13 @@ Repo (versioned):
 | Source | Persons covered (of 12,000) | Rows (masters) | + dupes (raw rows) | Native ref | Global-ref carry | Email carry* |
 |--------|----------------|----------------|--------------------|------------|------------------|--------------|
 | CIS customers | 12,000 (all) | 12,000 | +420 ≈ **12,420** | `CIS-#####` | 83% (all 10,000 seeded) | ~95% (contract) |
-| Core accounts | ~9,600 (80%) | 14,000 (1–2/person) | +280 ≈ **14,280** | `CB-#####` | 75% | ~85% |
-| Credit cards | ~5,400 (45%) | 6,600 | +130 ≈ **6,730** | `CC-#####` | 80% | ~85% |
-| Loans | ~2,650 (22%) | 2,800 | +55 ≈ **2,855** | `LN-#####` | 70% | ~85% |
-| Digital logins | ~9,000 (75%) | 55,000 (~6 events/person, 12-mo window) | +1,100 ≈ **56,100** | `DB-#####` | 85% | ~85% |
-| Support tickets | ~6,600 (55%) | 9,000 (1–2/person) | +180 ≈ **9,180** | `CS-#####` | 75% | ~85% |
+| Core accounts | ~9,600 (80%) | 14,000 (1–2/person) | +490 ≈ **14,490** | `CB-#####` | 75% | ~85% |
+| Credit cards | ~5,400 (45%) | 6,600 | +231 ≈ **6,831** | `CC-#####` | 80% | ~85% |
+| Loans | ~2,640 (22%) | 2,800 | +98 ≈ **2,898** | `LN-#####` | 70% | ~85% |
+| Digital logins | ~9,000 (75%) | 55,000 (~6 events/person, 12-mo window) | +1,925 ≈ **56,925** | `DB-#####` | 85% | ~85% |
+| Support tickets | ~6,600 (55%) | 9,000 (1–2/person) | +315 ≈ **9,315** | `CS-#####` | 75% | ~85% |
+
+**Row-count formula (documented — review 2026-11-19):** raw rows = masters × (1 + 2% exact duplicates + 1.5% near-duplicates) = **masters × 1.035**. The only records appended beyond masters are the two contracted duplicate-injection types; no other record types exist. (The earlier draft quoted masters × 1.02 for five sources because it counted only the 2% exact-duplicate injection; all six now use the full 3.5% formula, matching validation check 4.)
 
 \* email carry applies where the row's holder is known; the two columns are engineered so that rows with **neither** a resolvable global ref **nor** a matching email ≈ **2%** (orphans). Business attribute ranges (balances, limits, rates, statuses, domains) come verbatim from `02-source-data-contracts.md`.
 
