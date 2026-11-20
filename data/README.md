@@ -1,8 +1,8 @@
-# Generated Data Outputs (Phase 3)
+# Generated Data Outputs (Phase 3) & Bronze Landing (Phase 4)
 
 ## Location
 
-Unity Catalog volume `customer_360.default.raw_data`, batch folder `batch_001/`:
+Unity Catalog volume `customer_360.default.raw_data`, batch folder `batch_001/`: (Phase 3; read-only after generation)
 
 | File | Raw rows (masters) |
 |------|--------------------|
@@ -52,6 +52,33 @@ integration coverage) + 2,000 new persons with no global ref (R5 assigns
 `base_seed = 360` with per-source seed offsets; fixed event window
 2025-12-01 .. 2026-11-30 (no `now()` anywhere). Identical CONFIG produces
 byte-identical CSVs, verified by SHA-256 (validation checks 11 and 12).
+
+## Bronze (Phase 4, ingested 2026-11-20)
+
+Six managed Delta tables in schema `customer_360.bronze`, loaded by
+`notebooks/04_bronze_ingestion.py` (spec `specs/04-bronze-ingestion.md`):
+
+| Table | Rows | `_source_system` |
+|-------|------|------------------|
+| bronze.customers | 12,420 | cis |
+| bronze.accounts | 14,490 | core_banking |
+| bronze.cards | 6,831 | card_system |
+| bronze.loans | 2,898 | loan_system |
+| bronze.digital_logins | 56,925 | digital_banking |
+| bronze.support_tickets | 9,315 | support_system |
+
+* Raw-is-raw: all business columns STRING, verified file order; duplicates,
+  orphans, and invalid values preserved (33/33 acceptance checks passed;
+  row counts reconciled against `_manifest.json`).
+* Lineage per table: `_source_system`, `_batch_id` (`batch_001`),
+  `_ingestion_timestamp`, `_ingestion_date`, `_source_file`.
+* Idempotency: re-ingesting an existing `_batch_id` aborts (fail-closed); the
+  accidental duplicate append during Phase 4 testing was reverted via
+  `RESTORE TABLE ... TO VERSION AS OF 0` (Delta history retains both).
+* Storage: managed Delta tables (`table_type = MANAGED`, `format = delta`,
+  confirmed via `information_schema` and `DESCRIBE DETAIL`). On serverless
+  compute, Unity Catalog does not surface the physical cloud path for managed
+  tables (`storage_path` is NULL) -- table identity is catalog-qualified.
 
 ## Regenerating
 

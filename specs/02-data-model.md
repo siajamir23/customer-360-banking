@@ -1,6 +1,7 @@
 # 02 — Medallion Data Model & Gold Data Products
 
-**Phase:** 2 (Specifications & Data Modeling) · **Status:** In review  
+**Phase:** 2 (Specifications & Data Modeling) · **Status:** Approved  
+**Amendment 2 (Phase 4, approved 2026-11-20):** the support entity's tables are named `support_tickets` in every layer (bronze/silver/quarantine), per the Phase 4 instructions; the source FILE remains `support_cases_raw.csv` (file names unchanged).  
 **Depends on:** `02-source-data-contracts.md`, `02-customer-identity-resolution.md`, `02-scd-type-2.md`
 
 ## Objective
@@ -27,7 +28,7 @@ Define every dataset in the `customer_360` catalog — Bronze, Silver, Gold, Qua
 | `bronze.cards` | Credit Card | credit card | ~6,831 raw (6,600 masters) |
 | `bronze.loans` | Loan Management | loan | ~2,898 raw (2,800 masters) |
 | `bronze.digital_logins` | Digital Banking | login event | ~56,925 raw (55,000 masters) |
-| `bronze.support_cases` | Customer Support | support ticket | ~9,315 raw (9,000 masters) |
+| `bronze.support_tickets` | Customer Support | support ticket | ~9,315 raw (9,000 masters) |
 
 Common appended columns on every Bronze table: `_source_system STRING`, `_batch_id STRING`, `_ingestion_timestamp TIMESTAMP`, `_ingestion_date DATE`, `_source_file STRING`.
 
@@ -41,7 +42,7 @@ Ingestion properties (Phase 4): repeatable/idempotent per batch (`_batch_id` par
 
 | Table | Contains |
 |-------|----------|
-| `quarantine.invalid_customers`, `invalid_accounts`, `invalid_cards`, `invalid_loans`, `invalid_digital_logins`, `invalid_support_cases` | Rows failing Silver validation, with `_rejection_reason` (rule ID + message), `_source_system`, `_batch_id`, `_ingestion_timestamp`, and all original columns |
+| `quarantine.invalid_customers`, `invalid_accounts`, `invalid_cards`, `invalid_loans`, `invalid_digital_logins`, `invalid_support_tickets` | Rows failing Silver validation, with `_rejection_reason` (rule ID + message), `_source_system`, `_batch_id`, `_ingestion_timestamp`, and all original columns |
 | `quarantine.rejected_resolutions` | Identity-resolution conflicts needing human review (see identity spec) |
 
 Rejection is per-rule: one row may carry multiple reasons; the row is stored once per distinct failure reason for auditability (documented trade-off vs. single-row storage).
@@ -59,7 +60,7 @@ Rejection is per-rule: one row may carry multiple reasons; the row is stored onc
 | `silver.cards` | one row per card | typed; dates parsed; `unified_customer_id` |
 | `silver.loans` | one row per loan | typed; dates parsed; `unified_customer_id` |
 | `silver.digital_logins` | one row per login event | typed; timestamp parsed; `unified_customer_id` |
-| `silver.support_cases` | one row per ticket | typed; dates parsed; `unified_customer_id` |
+| `silver.support_tickets` | one row per ticket | typed; dates parsed; `unified_customer_id` |
 | `silver.customer_xref` | one row per (source_system, source_customer_ref) | **identity-resolution output** — the crosswalk between every source reference and the unified `CUST-######` (schema in identity spec) |
 
 All Silver tables keep `_source_system`, `_batch_id`, `_ingestion_timestamp`, `_ingestion_date`, `_source_file`.
@@ -177,7 +178,7 @@ customer_product_summary  customer_activity_summary  customer_financial_summary
 
 * **Business purpose:** the flagship current-state profile — one trusted row per customer; **the data product consumed by the fraud detection platform** (Phase 11).
 * **Grain:** one row per **current** customer. **Primary key:** `customer_id`.
-* **Transformation logic:** `dim_customer` (current row only) LEFT JOIN aggregates of `fact_customer_accounts`+`dim_account`, `silver.digital_logins`, `silver.support_cases`.
+* **Transformation logic:** `dim_customer` (current row only) LEFT JOIN aggregates of `fact_customer_accounts`+`dim_account`, `silver.digital_logins`, `silver.support_tickets`.
 * **Columns:**
 
 | Column | Type | Description |
@@ -217,7 +218,7 @@ customer_product_summary  customer_activity_summary  customer_financial_summary
 * **Business purpose:** monthly engagement metrics per customer — trend-ready input for behavior and risk analytics (e.g., failed-login spikes).
 * **Grain:** one row per **customer per activity month**. **PK:** (`customer_id`, `activity_month`). FK: `customer_id` → `dim_customer`.
 * **Columns:** `customer_id`, `activity_month` (`YYYY-MM`), `login_events`, `successful_logins`, `failed_logins`, `failed_login_rate`, `distinct_devices`, `primary_channel` (mode of channel), `avg_session_minutes`, `active_days`, `support_tickets_created`, `support_tickets_resolved`, `avg_csat`, `_batch_id`.
-* **Transformation logic:** `silver.digital_logins` and `silver.support_cases` aggregated by `unified_customer_id` + month(window of event timestamp).
+* **Transformation logic:** `silver.digital_logins` and `silver.support_tickets` aggregated by `unified_customer_id` + month(window of event timestamp).
 
 ### 4.8 `gold.customer_financial_summary` — Financial KPI Summary
 
