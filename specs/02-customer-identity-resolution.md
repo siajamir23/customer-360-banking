@@ -1,6 +1,7 @@
 # 02 — Customer Identity Resolution
 
 **Phase:** 2 (Specifications & Data Modeling) · **Status:** In review  
+**Amendment (Phase 5, approved 2026-11-21):** phone normalization aligned with the approved Silver rule — retain the **last 10 digits** after stripping non-digits; **fewer than 10 digits → NULL**; an invalid phone value **never independently rejects** an otherwise valid record. R1–R5 cascade unchanged.  
 **Depends on:** `02-source-data-contracts.md`, `phase-1-environment-inspection.md` (verified `CUST-######` domain)
 
 ## Objective
@@ -15,7 +16,7 @@ Consolidate customer references from six systems — each with its own native cu
 |-----|--------------------|
 | `global_customer_ref` | Uppercase, trim; validate `^CUST-[0-9]{6}$`; null otherwise |
 | Email | `lower(trim())`; strip surrounding whitespace; require `@` + domain dot; invalid → null (not a match key) |
-| Phone | Strip all non-digits; keep **last 10 digits** (drops country/area prefixes); < 7 digits → null |
+| Phone | Strip all non-digits; keep **last 10 digits** (drops country/area prefixes); **fewer than 10 digits → NULL** (aligned with Phase 5 Silver rule, approved 2026-11-21 — never an independent rejection; the record falls through to the next rule) |
 | Name | `upper(trim())`; remove punctuation; collapse internal whitespace; single canonical string (`FIRST~LAST`) |
 | Date of birth | Parse all 3 contracted formats → DATE; unparseable → quarantined at validation, never used for matching |
 

@@ -46,7 +46,7 @@ Define the logical and physical contracts for the six synthetic source systems t
 | `date_of_birth` | STRING | Date of birth — **mixed formats** | Match key | No | Parses under any of the 3 contracted formats; age 18–100 at registration |
 | `gender` | STRING | `M`, `F`, `U` | | Yes | Domain check |
 | `email` | STRING | Primary email — case varies, some invalid | Match key | Yes | Contains `@` and a dot in the domain; normalized `lower(trim())` |
-| `phone` | STRING | Primary phone — inconsistent formats | Match key | Yes | ≥ 7 digits after stripping non-digits; normalized to last-10-digits |
+| `phone` | STRING | Primary phone — inconsistent formats | Match key | Yes | Fewer than 10 digits after stripping non-digits → NULL; normalized to last-10-digits (aligned with Phase 5 Silver rule — approved 2026-11-21; never an independent rejection) |
 | `address_line1` | STRING | Street address | | Yes | Non-empty when present |
 | `city` | STRING | City | | Yes | Non-empty when present |
 | `country` | STRING | ISO code | | No | ∈ {PH, US, SG, AU, GB} |

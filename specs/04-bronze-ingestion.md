@@ -25,7 +25,7 @@ Location: `/Volumes/customer_360/default/raw_data/batch_001/` (7 files: 6 CSVs +
 
 Manifest (read, verified): `batch_001`, `base_seed 360`, `anchor_date 2026-11-30`, population 10,000 seeded + 2,000 new, 68/68 generation checks passed, per-file SHA-256 recorded. Manifest row counts are the **authoritative reconciliation baseline** for Bronze.
 
-Nullability observed in the actual files (e.g., `customers.global_customer_ref` 2,061 nulls; `digital_logins.customer_email` 9,796 nulls; `support_cases.csat_score` 2,321 nulls) is **expected defect engineering** (spec 02) and must arrive in Bronze unchanged.
+Nullability observed in the actual files (e.g., `customers.global_customer_ref` 2,061 nulls; `digital_logins.customer_email` 9,796 nulls; `support_tickets.csat_score` 2,321 nulls) is **expected defect engineering** (spec 02) and must arrive in Bronze unchanged.
 
 ## 3. Target Tables
 

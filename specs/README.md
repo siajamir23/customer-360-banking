@@ -26,8 +26,8 @@ This project follows **specification-driven development**: every major component
 | 2 | SCD Type 2 strategy (dim_customer) | `02-scd-type-2.md` | In review |
 | 2 | Fraud detection integration contract | `02-fraud-integration.md` | In review |
 | 3 | Synthetic multi-source data generation | `03-data-generation.md` | **Approved — specs updated per review** (population 12,000; Amendment 1 with email rules; `src/` modular layout) |
-| 4 | Bronze ingestion pipelines | `04-bronze-ingestion.md` | Pending |
-| 5 | Silver transformation & standardization | `05-silver-standardization.md` | Pending |
+| 4 | Bronze ingestion pipelines | `04-bronze-ingestion.md` | **Approved — implemented 2026-11-20** (33/33 acceptance checks; raw-is-raw, 5 lineage columns, fail-closed idempotency) |
+| 5 | Silver transformation & standardization | `05-silver-standardization.md` | **Approved 2026-11-21 — proposal + Amendments 1–6 incorporated** (dedup survivorship, phone <10→NULL, distinct-record reconciliation, exactly-one-pattern parsing, native-ref inventory, isolated quarantine testing) |
 | 6 | Customer identity resolution | `06-identity-resolution.md` | Pending |
 | 7 | SCD Type 2 implementation | `07-scd-type-2.md` | Pending |
 | 8 | Gold customer data products | `08-gold-datamarts.md` | Pending |
