@@ -12,15 +12,15 @@ The platform acts as a trusted upstream data provider for the companion project 
 
 ```
   Source Systems (synthetic data)          customer_360 catalog (Databricks Unity Catalog)
- ┌──────────────────────────────┐        ┌─────────────────────────────────────────────┐
+ ┌──────────────────────────────┐         ┌────────────────────────────────────────────┐
  │ Customer Information System  │──┐  ┌──►│ bronze    raw, as-ingested + source_system │
- │ Core Banking System          │──┼──┤   │           + batch_id + ingestion_timestamp│
- │ Credit Card System           │──┤  └──►│ silver    standardized + deduplicated     │
- │ Loan Management System       │──┼────►│           + validated + identity resolved │
- │ Digital Banking System       │──┤      │           + SCD Type 2 history          │
- │ Customer Support System      │──┘      │ gold      analytics data products        │
- └──────────────────────────────┘        │ quarantine  rejected records + reasons  │
-                                          └─────────────────────────────────────────────┘
+ │ Core Banking System          │──┼──┤   │           + batch_id + ingestion_timestamp │
+ │ Credit Card System           │──┤  └──►│ silver    standardized + deduplicated      │
+ │ Loan Management System       │──┼─────►│           + validated + identity resolved  │
+ │ Digital Banking System       │──┤      │           + SCD Type 2 history             │
+ │ Customer Support System      │──┘      │ gold      analytics data products          │
+ └──────────────────────────────┘         │ quarantine  rejected records + reasons     │
+                                          └────────────────────────────────────────────┘
                                                         │
                                                         ▼ (Phase 11 integration)
                                        fraud_detection.silver.customers (enriched)
