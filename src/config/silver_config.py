@@ -320,28 +320,33 @@ def business_columns(entity):
 
 
 # ---- verified batch_001 expectations (live inspection 2026-11-20/21).
+# ---- invalid_emails corrected 2026-11-24 (Amendment 9, Option A): counts
+# ---- of emails invalid AFTER normalization -- lower(trim()) applied before
+# ---- the regex, per spec 5.3 -- verified in the production run. The prior
+# ---- counts (611/396/215/88/1880/289) included whitespace-wrapped emails
+# ---- that become valid once trimmed and are preserved, not nulled.
 # ---- Reconciliation identities (Amendment 3) must match these exactly:
 # ----   bronze_rows = silver_rows + duplicate_rows + rejected_distinct
 # ---- where duplicate_rows = exact + near.
 EXPECTED_BATCH_001 = {
     "customers": {"bronze_rows": 12420, "silver_rows": 12000,
                   "exact_dup": 244, "near_dup": 176, "rejected_distinct": 0,
-                  "invalid_emails": 611},
+                  "invalid_emails": 410},
     "accounts": {"bronze_rows": 14490, "silver_rows": 14000,
                  "exact_dup": 284, "near_dup": 206, "rejected_distinct": 0,
-                 "invalid_emails": 396},
+                 "invalid_emails": 277},
     "cards": {"bronze_rows": 6831, "silver_rows": 6600,
               "exact_dup": 132, "near_dup": 99, "rejected_distinct": 0,
-              "invalid_emails": 215},
+              "invalid_emails": 142},
     "loans": {"bronze_rows": 2898, "silver_rows": 2800,
               "exact_dup": 56, "near_dup": 42, "rejected_distinct": 0,
-              "invalid_emails": 88},
+              "invalid_emails": 52},
     "digital_logins": {"bronze_rows": 56925, "silver_rows": 55000,
                        "exact_dup": 1248, "near_dup": 677, "rejected_distinct": 0,
-                       "invalid_emails": 1880},
+                       "invalid_emails": 1225},
     "support_tickets": {"bronze_rows": 9315, "silver_rows": 9000,
                          "exact_dup": 203, "near_dup": 112, "rejected_distinct": 0,
-                         "invalid_emails": 289},
+                         "invalid_emails": 210},
 }
 # Verified zero-defect counters for batch_001 (spec section 7):
 EXPECTED_BATCH_001_ZEROS = {

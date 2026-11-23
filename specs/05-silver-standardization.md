@@ -1,6 +1,7 @@
 # 05 — Silver Layer: Standardization, Deduplication, Validation & Quarantine
 
-**Phase:** 5 (Silver transformation) · **Status:** Approved — proposal 2026-11-20 + mandatory Amendments 1–6 (2026-11-21) + Amendments 7–8 (2026-11-24) incorporated  
+**Phase:** 5 (Silver transformation) · **Status:** Approved — proposal 2026-11-20 + mandatory Amendments 1–6 (2026-11-21) + Amendments 7–8 (2026-11-24) + Amendment 9 (2026-11-24, post-production reconciliation) incorporated
+
 **Depends on:** `02-source-data-contracts.md`, `02-data-model.md`, `02-customer-identity-resolution.md`, `03-data-generation.md`, `04-bronze-ingestion.md`, live Bronze inspection 2026-11-20/21 (all batch_001 expectations below verified against actual data, not spec assumptions)
 
 ## Objective
@@ -133,7 +134,7 @@ Rules:
 4. Silver enforces **cross-field ordering** instead (§7).
 
 ### 5.3 Email
-`lower(trim())`; require `^[^@ ]+@[^@ ]+\.[^@ ]+$`; invalid → **NULL** + audit count `invalid_emails_nulled` (D6 — identity §1: invalid email is not a match key; never a rejection; live counts 611/396/215/88/1,880/289). Raw value remains in Bronze.
+`lower(trim())`; require `^[^@ ]+@[^@ ]+\.[^@ ]+$`; invalid → **NULL** + audit count `invalid_emails_nulled` (D6 — identity §1: invalid email is not a match key; never a rejection; production-verified counts 410/277/142/52/1,225/210 per **A9**: invalid **after** normalization — `lower(trim())` is applied *before* the regex. The generator's raw injected email defects total 611/396/215/88/1,880/289, of which 201/119/73/36/655/79 are whitespace-wrapped values (` email@example.org `) that become valid once trimmed and are therefore preserved in Silver, not nulled). Raw value remains in Bronze.
 
 ### 5.4 Phone (Amendment 2)
 
@@ -230,8 +231,8 @@ Synthetic invalid records exist **only** inside unit tests / temporary test Data
 2. **Reconciliation identity (Amendment 3)** — both §8 identities hold per table per batch, against the batch_001 expectations above; multi-reason records counted once.
 3. **PK uniqueness** — zero PK repeats in every Silver table; zero full-row duplicate business rows.
 4. **Normalization proofs** — email valid-or-NULL and lowercase; phone **exactly 10 digits or NULL** (Amendment 2); zero `other`-format dates/timestamps; `name_key` populated on customers; all strings trimmed.
-5. **Engineered-null preservation** — nullable-column NULL counts equal Bronze counts adjusted for invalid→NULL (e.g., customers email NULL = 634 engineered + 611 invalid = 1,245).
-6. **Value-nullification audit** — `invalid_emails_nulled`, `invalid_refs_nulled`, `invalid_phones_nulled` in `processing_audit` match Bronze-side counts exactly.
+5. **Engineered-null preservation** — nullable-column NULL counts equal Bronze counts adjusted for invalid→NULL (production-verified 2026-11-24 per **A9**: customers email NULL = 1,009 = 615 engineered-NULL families + 394 invalid-nulled families; the earlier "634 engineered + 611 invalid = 1,245" arithmetic double-counted raw defects that trimming recovers or dedup eliminates).
+6. **Value-nullification audit** — `invalid_emails_nulled`, `invalid_refs_nulled`, `invalid_phones_nulled` in `processing_audit` match Bronze-side counts exactly, evaluated under the §5.3 rule order (normalize first, validate after — A9).
 7. **Dedup determinism (Amendment 1)** — recomputing survivor selection reproduces identical survivors (hash comparison); precedence order documented in code; tie-break firings logged; hash documented as deterministic-not-truth-asserting.
 8. **Bronze untouched** — Bronze row counts and latest Delta version identical before/after the run.
 9. **Idempotency negative test** — re-running the processed batch aborts; zero rows added to any table.
@@ -260,3 +261,4 @@ No Phase 3/4 files are modified; `fraud_detection` untouched; no Gold; no identi
 * **A8 — `session_duration_minutes` stored as integral decimal notation** in Bronze (verified 2026-11-24: 52,892 `'150.0'`-style rows, 4,033 NULL on FAILED, no integer notation, no genuinely fractional values): cast via DECIMAL to INT with **integral values only** — `'150.0'` → 150, `'65.0'` → 65, NULL → NULL; genuinely fractional values (`'150.7'`) are rejected as `SESSION_DURATION_INVALID` and never silently truncated to an integer. Same policy as `csat_score` (A5). `term_months` remains strict integer-notation parsing (verified: all 2,898 values integer notation).
 * **A6 — Third timestamp pattern** (`MM-dd-yyyy HH:mm`, **8,604 rows** observed) is approved alongside the two patterns the contracts §5 lists for `login_timestamp`; Amendment 4 requires defining patterns from actual values, so all three are approved parsers. **Parsing is explicit per pattern (no format inference), and unit tests must cover all three approved patterns at both timestamp precisions** (ISO with seconds `yyyy-MM-dd HH:mm:ss`; `dd/MM/yyyy HH:mm`; `MM-dd-yyyy HH:mm`) — see §12.
 * **D2 layout** — the shared `duplicate_records` table stores original rows as `_source_row_json` because the six entities have different column sets; all key fields (`_entity`, `_record_pk`, `_survivor_pk`, reason, lineage) are first-class columns.
+* **A9 — Email invalidity is evaluated after normalization** (approved 2026-11-24, post-production Option A): §5.3's written order — `lower(trim(email))` followed by regex validation — is authoritative and the implementation already follows it. The generator injects three raw email defect forms (`@`→" at ", dot-stripped domain, whitespace-wrapped ` value `); the first two remain invalid after trimming, but the third becomes a valid email once trimmed and is **preserved in Silver, not nulled**. Production-verified `invalid_emails_nulled` = 410/277/142/52/1,225/210 (customers…support_tickets); the previously recorded 611/396/215/88/1,880/289 counted raw injected defects including 201/119/73/36/655/79 whitespace-wrapped ones. Also verified in the production run: `quarantine.duplicate_records` batch_001 total = **3,479** (the exact sum of the per-entity approved counts — 244+176, 284+206, 132+99, 56+42, 1,248+677, 203+112; the "3,279" quoted in the 2026-11-24 execution approval was an arithmetic slip). No transformation logic, Silver data, audit rows, or other business rule changed — specification and `EXPECTED_BATCH_001` were reconciled to the production results.
