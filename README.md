@@ -60,11 +60,11 @@ customer-360-banking/
 | Phase | Deliverable | Status |
 |-------|-------------|--------|
 | 1 | Environment inspection & project architecture | ✅ Done |
-| 2 | Project specifications & data modeling | ✅ Specs complete — in review |
-| 3 | Synthetic multi-source data generation | |
-| 4 | Bronze ingestion pipelines | |
-| 5 | Silver transformation & standardization | |
-| 6 | Customer identity resolution | |
+| 2 | Project specifications & data modeling | ✅ Specs complete — identity + data model approved 2026-11-24 (Phase 6 amendments); remaining Phase 2 specs in review |
+| 3 | Synthetic multi-source data generation | ✅ Done — 12,000-person population, batch_001, SHA-256 reproducible |
+| 4 | Bronze ingestion pipelines | ✅ Done — six tables ingested 2026-11-20, 33/33 acceptance checks |
+| 5 | Silver transformation & standardization | ✅ Done — spec approved 2026-11-21, production-validated on batch_001 |
+| 6 | Customer identity resolution | 🔄 Spec approved 2026-11-24 (RA1–RA15) — implementation next |
 | 7 | SCD Type 2 implementation | |
 | 8 | Gold customer data products | |
 | 9 | Data quality & reconciliation | |

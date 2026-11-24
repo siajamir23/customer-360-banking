@@ -41,9 +41,11 @@ integration coverage) + 2,000 new persons with no global ref (R5 assigns
   global ref, so they remain resolvable via R1 (missing/invalid email is never
   an automatic rejection).
 * Identity conflicts (~3% of dual-key rows): email of person B with global ref
-  of person A -> quarantined in Phase 6, never merged.
+  of person A -> quarantined in Phase 6 (reason `EMAIL_REF_CONFLICT`), never
+  merged.
 * Orphans (2%): fabricated native refs (e.g. `CB-99001`), no global ref, email
-  matching no person.
+  matching no person -> unresolved identity in Phase 6 (reason
+  `ORPHAN_NO_R1_R2`).
 * Date columns: 60% ISO / 25% DD/MM/YYYY / 15% MM-DD-YYYY (datetimes have
   matching time variants).
 
