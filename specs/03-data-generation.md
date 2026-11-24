@@ -9,7 +9,7 @@ Produce six reproducible, entirely synthetic banking source datasets (CSV) that 
 
 ---
 
-## ✅ Amendment 1 — APPROVED 2026-11-19 (with binding email-matching rules)
+## Amendment 1 — APPROVED 2026-11-19 (with binding email-matching rules)
 
 **Gap (found while designing this phase):** the five product contracts (accounts, cards, loans, digital logins, support cases) carried only a native customer ref and a `global_customer_ref` — no PII match key. R1 (global ref) has a 70–85% carry rate and R2–R4 keys existed only on CIS, so 15–30% of product rows would have been deterministically unresolvable, contradicting the approved ~2% orphan rate.
 

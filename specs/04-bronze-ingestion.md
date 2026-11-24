@@ -16,12 +16,12 @@ Location: `/Volumes/customer_360/default/raw_data/batch_001/` (7 files: 6 CSVs +
 
 | File | Rows (actual = manifest) | Bytes | Business columns (verified header order) |
 |------|--------------------------|-------|------------------------------------------|
-| customers_raw.csv | 12,420 = 12,420 ✓ | 2,266,259 | 18 |
-| accounts_raw.csv | 14,490 = 14,490 ✓ | 1,759,868 | 12 |
-| cards_raw.csv | 6,831 = 6,831 ✓ | 876,598 | 11 |
-| loans_raw.csv | 2,898 = 2,898 ✓ | 355,450 | 13 |
-| digital_logins_raw.csv | 56,925 = 56,925 ✓ | 7,340,960 | 12 |
-| support_cases_raw.csv | 9,315 = 9,315 ✓ | 978,187 | 11 |
+| customers_raw.csv | 12,420 = 12,420 | 2,266,259 | 18 |
+| accounts_raw.csv | 14,490 = 14,490 | 1,759,868 | 12 |
+| cards_raw.csv | 6,831 = 6,831 | 876,598 | 11 |
+| loans_raw.csv | 2,898 = 2,898 | 355,450 | 13 |
+| digital_logins_raw.csv | 56,925 = 56,925 | 7,340,960 | 12 |
+| support_cases_raw.csv | 9,315 = 9,315 | 978,187 | 11 |
 
 Manifest (read, verified): `batch_001`, `base_seed 360`, `anchor_date 2026-11-30`, population 10,000 seeded + 2,000 new, 68/68 generation checks passed, per-file SHA-256 recorded. Manifest row counts are the **authoritative reconciliation baseline** for Bronze.
 
