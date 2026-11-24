@@ -74,7 +74,6 @@ customer-360-banking/
 
 ## Key Design Decisions
 
-* **Separate catalog (`customer_360`), separate repo** — zero blast radius on the existing fraud detection platform; both projects remain independently reviewable portfolio pieces.
 * **Shared customer ID domain (`CUST-######`)** — synthetic sources are seeded from the same customer population as the fraud detection project so the Phase 11 integration joins with referential integrity.
 * **`source_system` + `batch_id` in bronze** — enables repeatable, idempotent ingestion and per-batch lineage (an extension of the single-source pattern used in the fraud project).
 * **Identity resolution as an isolated stage** — cross-system matching is the hardest transformation in Customer 360; isolating it makes it independently testable and debuggable.
