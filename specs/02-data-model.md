@@ -2,6 +2,7 @@
 
 **Phase:** 2 (Specifications & Data Modeling) · **Status:** Approved  
 **Amendment 2 (Phase 4, approved 2026-11-20):** the support entity's tables are named `support_tickets` in every layer (bronze/silver/quarantine), per the Phase 4 instructions; the source FILE remains `support_cases_raw.csv` (file names unchanged).  
+**Amendment 3 (Phase 6, approved 2026-11-24):** Silver product tables **never** carry `unified_customer_id` — it is exposed via one `*_resolved` view per entity (LEFT JOIN `silver.customer_xref`, Phase 6 D6); `customer_xref` enums extended with `UNRESOLVED`; `quarantine.rejected_resolutions` schema defined (grain incl. `_batch_id`, `candidate_evidence` struct — authoritative in `06-identity-resolution.md` §4.2); `silver.r5_allocation_ledger` and `silver.identity_resolution_control` added as internal Phase 6 allocation machinery (not consumer-facing).  
 **Depends on:** `02-source-data-contracts.md`, `02-customer-identity-resolution.md`, `02-scd-type-2.md`
 
 ## Objective
@@ -43,7 +44,7 @@ Ingestion properties (Phase 4): repeatable/idempotent per batch (`_batch_id` par
 | Table | Contains |
 |-------|----------|
 | `quarantine.invalid_customers`, `invalid_accounts`, `invalid_cards`, `invalid_loans`, `invalid_digital_logins`, `invalid_support_tickets` | Rows failing Silver validation, with `_rejection_reason` (rule ID + message), `_source_system`, `_batch_id`, `_ingestion_timestamp`, and all original columns |
-| `quarantine.rejected_resolutions` | Identity-resolution conflicts needing human review (see identity spec) |
+| `quarantine.rejected_resolutions` | Identity-resolution review cases (conflicts, `NAME_DOB_REVIEW`, `CIS_IDENTIFIER_CONFLICT`, `IDENTITY_DRIFT`) and unresolved-identity orphans (`ORPHAN_NO_R1_R2`); grain (`source_system`, `source_customer_ref`, `reason_code`, `_batch_id`); `candidate_evidence` ARRAY of STRUCT(evidence_type, evidence_value, candidate_unified_id, match_rule) — authoritative schema in `06-identity-resolution.md` §4.2; review and unresolved categories reconciled separately |
 
 Rejection is per-rule: one row may carry multiple reasons; the row is stored once per distinct failure reason for auditability (documented trade-off vs. single-row storage).
 
@@ -56,12 +57,16 @@ Rejection is per-rule: one row may carry multiple reasons; the row is stored onc
 | Table | Grain | Key Changes vs. Bronze |
 |-------|-------|------------------------|
 | `silver.customers` | one row per deduplicated CIS customer | typed columns; dates parsed to DATE/TIMESTAMP; email/phone/name normalized; dedup by `cis_customer_id` keeping most recent |
-| `silver.accounts` | one row per deposit account | typed; dates parsed; `unified_customer_id` added by identity resolution |
-| `silver.cards` | one row per card | typed; dates parsed; `unified_customer_id` |
-| `silver.loans` | one row per loan | typed; dates parsed; `unified_customer_id` |
-| `silver.digital_logins` | one row per login event | typed; timestamp parsed; `unified_customer_id` |
-| `silver.support_tickets` | one row per ticket | typed; dates parsed; `unified_customer_id` |
-| `silver.customer_xref` | one row per (source_system, source_customer_ref) | **identity-resolution output** — the crosswalk between every source reference and the unified `CUST-######` (schema in identity spec) |
+| `silver.accounts` | one row per deposit account | typed; dates parsed; identity enrichment via the `silver.accounts_resolved` view (Phase 6 D6 — the table itself never carries `unified_customer_id`) |
+| `silver.cards` | one row per card | typed; dates parsed; identity enrichment via the `silver.cards_resolved` view (Phase 6 D6) |
+| `silver.loans` | one row per loan | typed; dates parsed; identity enrichment via the `silver.loans_resolved` view (Phase 6 D6) |
+| `silver.digital_logins` | one row per login event | typed; timestamp parsed; identity enrichment via the `silver.digital_logins_resolved` view (Phase 6 D6) |
+| `silver.support_tickets` | one row per ticket | typed; dates parsed; identity enrichment via the `silver.support_tickets_resolved` view (Phase 6 D6) |
+| `silver.customer_xref` | one row per (source_system, source_customer_ref) | **identity-resolution output** — the crosswalk between every source reference and the unified `CUST-######` (schema in identity spec; `match_rule`/`match_confidence` enums extended with `UNRESOLVED`, Phase 6) |
+| `silver.r5_allocation_ledger` | one row per (batch_id, cis_customer_id) | **Phase 6 internal allocation machinery** — durable R5 reservation history (`RESERVED` → `COMMITTED` / `ABANDONING` → `ABANDONED`; rows never deleted; `unified_customer_id` globally unique); schema in `06-identity-resolution.md` §3.1 |
+| `silver.identity_resolution_control` | singleton (exactly one row) | **Phase 6 internal allocation machinery** — enforceable single-writer gate (`IDLE`/`BUSY` atomic check-and-set); not consumer-facing |
+
+Identity-enriched views (Phase 6, one per entity: `customers_resolved`, `accounts_resolved`, `cards_resolved`, `loans_resolved`, `digital_logins_resolved`, `support_tickets_resolved`): the Silver table LEFT JOIN `silver.customer_xref` on the native reference — `unified_customer_id` appears only in these views and in `customer_xref`.
 
 All Silver tables keep `_source_system`, `_batch_id`, `_ingestion_timestamp`, `_ingestion_date`, `_source_file`.
 

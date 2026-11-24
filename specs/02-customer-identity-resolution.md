@@ -1,6 +1,7 @@
 # 02 — Customer Identity Resolution
 
-**Phase:** 2 (Specifications & Data Modeling) · **Status:** In review  
+**Phase:** 2 (Specifications & Data Modeling) · **Status:** Approved (Phase 6 amendments applied 2026-11-24)  
+**Amendment (Phase 6, approved 2026-11-24):** implementation-detail amendments per `06-identity-resolution.md` (RA1–RA15): R4 never auto-adopts (outcome `IN_REVIEW`, reason `NAME_DOB_REVIEW`); the §2 cascade conflict note is superseded by the quarantine reading (a valid gref→B with any distinct email→A is `IN_REVIEW`/`EMAIL_REF_CONFLICT` — never auto-merged); CIS evaluates R1/R2/R3 independently before assignment (pairwise disagreement → `CIS_IDENTIFIER_CONFLICT`); orphan path defined (`UNRESOLVED` xref row + `ORPHAN_NO_R1_R2`); xref enums extended with `UNRESOLVED`; incremental drift behavior (`IDENTITY_DRIFT`, first-resolution-wins); `rejected_resolutions` schema (§6.1); R5 allocation ledger + control row (§6.2).  
 **Amendment (Phase 5, approved 2026-11-21):** phone normalization aligned with the approved Silver rule — retain the **last 10 digits** after stripping non-digits; **fewer than 10 digits → NULL**; an invalid phone value **never independently rejects** an otherwise valid record. R1–R5 cascade unchanged.  
 **Depends on:** `02-source-data-contracts.md`, `phase-1-environment-inspection.md` (verified `CUST-######` domain)
 
@@ -27,10 +28,13 @@ Consolidate customer references from six systems — each with its own native cu
 | **R1** | `global_customer_ref` | Exact match to an existing unified ID | `EXACT` | Adopt existing `customer_id` |
 | **R2** | Email (normalized) | Exact match to an existing customer's email | `EXACT` | Adopt existing `customer_id` |
 | **R3** | Phone (normalized) | Exact match to an existing customer's phone | `HIGH` | Adopt existing `customer_id` |
-| **R4** | Name + DOB | Both exact (normalized) | `MEDIUM` | Adopt existing `customer_id` |
+| **R4** | Name + DOB | Both exact (normalized) | `MEDIUM` | `IN_REVIEW` — never auto-adopt; one **or more** matches divert to review, reason `NAME_DOB_REVIEW` (Phase 6 D4) |
 | **R5** | — | No rule matched | `NEW` | **Register new customer**: next `CUST-######` from `CUST-100001` upward (existing domain verified to end at `CUST-010000`; no collision by construction) |
 
-Rules stop at first hit (cascade semantics). If a record hits a rule but with a **conflicting** `global_customer_ref` (R2–R4 match to customer A while carrying a ref of customer B), the record goes to `quarantine.rejected_resolutions` instead of silently choosing (see §5).
+Rules stop at first hit (cascade semantics) **only when no contradictory identity evidence exists** — conflicting evidence diverts to `quarantine.rejected_resolutions` instead of silently choosing (see §5). This quarantine reading supersedes any pure cascade-precedence reading (Phase 6 D1):
+
+* **CIS records:** R1/R2/R3 evidence is evaluated **independently before** an identity is assigned; candidates identifying **different** unified IDs (R1-vs-R2, R1-vs-R3, R2-vs-R3) → `IN_REVIEW`, reason `CIS_IDENTIFIER_CONFLICT`. R4 is evaluated only when R1–R3 have not resolved the record, and never auto-adopts.
+* **Product references:** a valid `global_customer_ref` resolving to customer B while **any** distinct email resolves to customer A ≠ B → `IN_REVIEW`, reason `EMAIL_REF_CONFLICT` — even when other evidence of the same reference agrees with B (no silent choosing).
 
 **Match seed order:** CIS customers are resolved first (they found the master population), then Core Banking, Cards, Loans, Digital, Support — each later system matches against the accumulated identity set. Order is fixed and documented for reproducibility.
 
@@ -61,6 +65,7 @@ A record is diverted to `quarantine.rejected_resolutions` (with full original ro
 * R2–R4 match customer A **but** the record carries a different valid `global_customer_ref` (B ≠ A).
 * R4 (name+DOB) matches **multiple** distinct existing customers.
 * Phone matches one customer and email matches a different one (disagreeing HIGH/EXACT keys).
+* No resolvable evidence at all — no valid `global_customer_ref` and no email resolving to any customer (**orphan**, Phase 6 D3): xref row with `match_rule = UNRESOLVED` plus a `rejected_resolutions` row, reason `ORPHAN_NO_R1_R2`, recording the evidence tried.
 
 Review disposition options (documented, applied manually later): accept A, accept B, or register new. Diverted records **do not** block their source batch; product rows whose customer is in review resolve with `unified_customer_id = NULL` and are excluded from Gold (counted in reconciliation, never silently dropped).
 
@@ -74,16 +79,24 @@ Review disposition options (documented, applied manually later): accept A, accep
 | `source_customer_ref` | STRING | Native PK of the customer in that system (`CIS-#####`, `CB-#####`, …) |
 | `global_customer_ref_raw` | STRING | Ref as provided in source (nullable; for audit) |
 | `unified_customer_id` | STRING | Resolved `CUST-######`; NULL if in review |
-| `match_rule` | STRING | `R1_GLOBAL_REF` / `R2_EMAIL` / `R3_PHONE` / `R4_NAME_DOB` / `R5_NEW` / `IN_REVIEW` |
-| `match_confidence` | STRING | `EXACT` / `HIGH` / `MEDIUM` / `NEW` / `IN_REVIEW` |
+| `match_rule` | STRING | `R1_GLOBAL_REF` / `R2_EMAIL` / `R3_PHONE` / `R4_NAME_DOB` / `R5_NEW` / `IN_REVIEW` / `UNRESOLVED` (orphan refs, Phase 6 D3; `R4_NAME_DOB` rows cannot occur — R4 diverts to `IN_REVIEW`) |
+| `match_confidence` | STRING | `EXACT` / `HIGH` / `MEDIUM` / `NEW` / `IN_REVIEW` / `UNRESOLVED` |
 | `match_timestamp` | TIMESTAMP | Resolution run time |
 | `_batch_id` | STRING | Lineage |
 
-**Invariants:** every Silver product table's `unified_customer_id` comes from this table (single source of truth); a `source_customer_ref` never maps to two `unified_customer_id`s; `R5_NEW` IDs are never reused.
+**Invariants:** every Silver product table's `unified_customer_id` comes from this table (single source of truth — exposed via the `*_resolved` views, Phase 6 D6); each (`source_system`, `source_customer_ref`) maps to **at most one** `unified_customer_id` — **multiple references may map to the same unified customer** (many-to-one, expected); an `R5_NEW` ID is never assigned to two distinct persons and never reused.
+
+### 6.1 `quarantine.rejected_resolutions` (Phase 6 output — authoritative schema in `06-identity-resolution.md` §4.2)
+
+**Grain:** one row per (`source_system`, `source_customer_ref`, `reason_code`, `_batch_id`) — `_batch_id` in the grain keeps identity-drift events for the same reference across batches independently auditable. Columns: `source_system`, `source_customer_ref`, `reason_code` (`EMAIL_REF_CONFLICT` / `EMAIL_EMAIL_CONFLICT` / `CIS_IDENTIFIER_CONFLICT` / `NAME_DOB_REVIEW` / `ORPHAN_NO_R1_R2` / `UNRESOLVED_GLOBAL_REF` / `IDENTITY_DRIFT`), `candidate_evidence ARRAY<STRUCT<evidence_type STRING, evidence_value STRING, candidate_unified_id STRING, match_rule STRING>>` — one entry per distinct evidence value (`GLOBAL_REF`/`EMAIL`/`PHONE`/`NAME_DOB`, plus a distinguished `EXISTING_ASSIGNMENT` entry on drift records), deterministic ordering — `global_customer_ref_raw`, `_batch_id`, `_quarantine_timestamp`. Review cases (all reasons except `ORPHAN_NO_R1_R2`) and unresolved identity (`ORPHAN_NO_R1_R2`) are stored together but reconciled and reported separately. Original source rows remain in Silver, recoverable by (`source_system`, native reference).
+
+### 6.2 R5 allocation & recovery (summary — full detail in `06-identity-resolution.md` §3)
+
+`R5_NEW` assignments are reserved durably in `silver.r5_allocation_ledger` (grain (`batch_id`, `cis_customer_id`); `unified_customer_id` globally unique across all states and batches; states `RESERVED` → `COMMITTED` | `ABANDONING` → `ABANDONED`; rows never deleted) in **one atomic append before any downstream write**; downstream xref rows are written by joining the ledger, never by re-running the allocator. Allocation is globally serialized by a singleton `silver.identity_resolution_control` row via an **atomic check-and-set** (`IDLE` → `BUSY`) — enforceable single-writer. Recovery: **resume** (re-derive downstream writes from the `RESERVED` ledger mapping — the exact original assignments), **delete-and-replay** (latest batch only, enforced on the ledger), or **abandonment** (idempotent, resumable six-step protocol; control row `BUSY` throughout; abandoned IDs never freed or reused). Declared table constraints are informational — the allocator validates uniqueness (no duplicate ID across any state, no duplicate allocation key, no duplicate sequence, no xref collision) and fails closed before the reservation append. Determinism: ascending `cis_customer_id` within a batch; global assignment is deterministic for the fixed serialized batch-processing order only.
 
 ## 7. Incremental Behavior
 
-Identity resolution is rerun per batch: new source records match against the existing xref + accumulated identities; existing xref rows are immutable (an identity, once assigned, is never re-pointed without the review flow — prevents identity drift). Weekly full-audit query re-verifies invariants (Phase 9).
+Identity resolution is rerun per batch: new source records match against the existing xref + accumulated identities; existing xref rows are immutable (an identity, once assigned, is never re-pointed without the review flow). **Existing-reference behavior (Phase 6):** first resolution wins — every later appearance of an already-resolved reference is a verification pass: consistent evidence confirms the assignment (no new xref row); contradictory evidence is recorded as **identity drift** (a `rejected_resolutions` row, reason `IDENTITY_DRIFT`, with the existing assignment preserved as a distinguished `EXISTING_ASSIGNMENT` evidence entry) and surfaced for review — never silently ignored, never used to rewrite xref. Reconciliation reports initial conflicts, orphans, verified references, and drift as separate categories. Weekly full-audit query re-verifies invariants (Phase 9).
 
 ## Assumptions
 
